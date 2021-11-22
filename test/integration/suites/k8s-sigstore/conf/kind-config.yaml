@@ -18,5 +18,3 @@ nodes:
   extraMounts:
   - containerPath: /etc/kubernetes/pki/admctrl
     hostPath: CONFDIR/admctrl
-  - containerPath: /mnt/reg-certificate
-    hostPath: CONFDIR

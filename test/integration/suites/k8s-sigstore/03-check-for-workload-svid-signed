@@ -7,8 +7,6 @@ check_for_workload_svid "spiffe://example.org/ns/default/sa/default/workload-sig
 
 if [ "${DONE}" -eq 1 ]; then
     log-info "SPIFFE ID found."
-elif [ "${DONE}" -eq 0 ]; then
-    fail-now "timed out waiting for workload to obtain credentials."
 else
-    fail-now "failed to check for svid"
+    fail-now "timed out waiting for workload to obtain credentials."
 fi

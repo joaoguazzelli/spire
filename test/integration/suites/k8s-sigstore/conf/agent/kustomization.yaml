@@ -4,7 +4,6 @@ kind: Kustomization
 
 # list of Resource Config to be Applied
 resources:
-  - registry-secret.yaml
   - spire-agent.yaml
 
 # namespace to deploy all Resources to
