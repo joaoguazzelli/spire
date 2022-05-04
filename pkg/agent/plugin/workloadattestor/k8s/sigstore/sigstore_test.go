@@ -55,6 +55,46 @@ func (s signature) Bundle() (*oci.Bundle, error) {
 	return s.bundle, nil
 }
 
+func createCertificate(template *x509.Certificate, parent *x509.Certificate, pub interface{}, priv crypto.Signer) (*x509.Certificate, error) {
+	certBytes, err := x509.CreateCertificate(rand.Reader, template, parent, pub, priv)
+	if err != nil {
+		return nil, err
+	}
+
+	cert, err := x509.ParseCertificate(certBytes)
+	if err != nil {
+		return nil, err
+	}
+	return cert, nil
+}
+
+func GenerateRootCa() (*x509.Certificate, *ecdsa.PrivateKey, error) {
+	rootTemplate := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject: pkix.Name{
+			CommonName:   "sigstore",
+			Organization: []string{"sigstore.dev"},
+		},
+		NotBefore:             time.Now().Add(-5 * time.Minute),
+		NotAfter:              time.Now().Add(5 * time.Hour),
+		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
+		BasicConstraintsValid: true,
+		IsCA:                  true,
+	}
+
+	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	cert, err := createCertificate(rootTemplate, rootTemplate, &priv.PublicKey, priv)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return cert, priv, nil
+}
+
 func TestNew(t *testing.T) {
 	newcache := sigstorecache.NewCache(maximumAmountCache)
 
@@ -72,6 +112,7 @@ func TestNew(t *testing.T) {
 				subjectAllowList:           map[string]bool{},
 				rekorURL:                   url.URL{Scheme: rekor.DefaultSchemes[0], Host: rekor.DefaultHost, Path: rekor.DefaultBasePath},
 				sigstorecache:              newcache,
+				checkOptsFunction:          DefaultCheckOpts,
 			},
 		},
 	}
@@ -92,6 +133,17 @@ func TestSigstoreimpl_FetchImageSignatures(t *testing.T) {
 	type args struct {
 		imageName string
 	}
+	emptyCheckOptsFunction := func(url.URL) *cosign.CheckOpts {
+		co := &cosign.CheckOpts{}
+		co.RekorClient := new(client.Rekor)
+		rootCert, _, _ := test.GenerateRootCa()
+		rootPool := x509.NewCertPool()
+		rootPool.AddCert(rootCert)
+		co.RootCerts = rootPool
+
+		return co
+	}
+
 	tests := []struct {
 		name    string
 		fields  fields
@@ -297,6 +349,7 @@ func TestSigstoreimpl_FetchImageSignatures(t *testing.T) {
 				verifyFunction:             tt.fields.verifyFunction,
 				fetchImageManifestFunction: tt.fields.fetchImageManifestFunction,
 				sigstorecache:              sigstorecache.NewCache(maximumAmountCache),
+				checkOptsFunction:          emptyCheckOptsFunction,
 			}
 			got, err := sigstore.FetchImageSignatures(tt.args.imageName)
 			if (err != nil) != tt.wantErr {
