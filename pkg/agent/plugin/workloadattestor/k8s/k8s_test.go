@@ -11,6 +11,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"errors"
 	"fmt"
 	"io"
 	"math/big"
@@ -22,6 +23,8 @@ import (
 	"testing"
 	"time"
 
+	v1 "github.com/google/go-containerregistry/pkg/v1"
+	"github.com/sigstore/cosign/pkg/oci"
 	"github.com/spiffe/spire/pkg/agent/common/cgroups"
 	"github.com/spiffe/spire/pkg/agent/plugin/workloadattestor"
 	"github.com/spiffe/spire/pkg/common/pemutil"
@@ -33,6 +36,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -132,6 +136,51 @@ FwOGLt+I3+9beT0vo+pn9Rq0squewFYe3aJbwpkyfP2xOovQCdm4PC8y
 		{Type: "k8s", Value: "pod-uid:d488cae9-b2a0-11e7-9350-020968147796"},
 		{Type: "k8s", Value: "sa:flannel"},
 	}
+
+	testSigstoreSelectors = []*common.Selector{
+		{Type: "k8s", Value: "container-image:docker-pullable://localhost/spiffe/blog@sha256:0cfdaced91cb46dd7af48309799a3c351e4ca2d5e1ee9737ca0cbd932cb79898"},
+		{Type: "k8s", Value: "container-image:localhost/spiffe/blog:latest"},
+		{Type: "k8s", Value: "container-name:blog"},
+		{Type: "k8s", Value: "image-signature-subject:sigstore-subject"},
+		{Type: "k8s", Value: "node-name:k8s-node-1"},
+		{Type: "k8s", Value: "ns:default"},
+		{Type: "k8s", Value: "pod-image-count:2"},
+		{Type: "k8s", Value: "pod-image:docker-pullable://localhost/spiffe/blog@sha256:0cfdaced91cb46dd7af48309799a3c351e4ca2d5e1ee9737ca0cbd932cb79898"},
+		{Type: "k8s", Value: "pod-image:docker-pullable://localhost/spiffe/ghostunnel@sha256:b2fc20676c92a433b9a91f3f4535faddec0c2c3613849ac12f02c1d5cfcd4c3a"},
+		{Type: "k8s", Value: "pod-image:localhost/spiffe/blog:latest"},
+		{Type: "k8s", Value: "pod-image:localhost/spiffe/ghostunnel:latest"},
+		{Type: "k8s", Value: "pod-init-image-count:0"},
+		{Type: "k8s", Value: "pod-label:k8s-app:blog"},
+		{Type: "k8s", Value: "pod-label:version:v0"},
+		{Type: "k8s", Value: "pod-name:blog-24ck7"},
+		{Type: "k8s", Value: "pod-owner-uid:ReplicationController:2c401175-b29f-11e7-9350-020968147796"},
+		{Type: "k8s", Value: "pod-owner:ReplicationController:blog"},
+		{Type: "k8s", Value: "pod-uid:2c48913c-b29f-11e7-9350-020968147796"},
+		{Type: "k8s", Value: "sa:default"},
+		{Type: "k8s", Value: "sigstore-validation:passed"},
+	}
+
+	testSigstoreSkippedSelectors = []*common.Selector{
+		{Type: "k8s", Value: "container-image:docker-pullable://localhost/spiffe/blog@sha256:0cfdaced91cb46dd7af48309799a3c351e4ca2d5e1ee9737ca0cbd932cb79898"},
+		{Type: "k8s", Value: "container-image:localhost/spiffe/blog:latest"},
+		{Type: "k8s", Value: "container-name:blog"},
+		{Type: "k8s", Value: "node-name:k8s-node-1"},
+		{Type: "k8s", Value: "ns:default"},
+		{Type: "k8s", Value: "pod-image-count:2"},
+		{Type: "k8s", Value: "pod-image:docker-pullable://localhost/spiffe/blog@sha256:0cfdaced91cb46dd7af48309799a3c351e4ca2d5e1ee9737ca0cbd932cb79898"},
+		{Type: "k8s", Value: "pod-image:docker-pullable://localhost/spiffe/ghostunnel@sha256:b2fc20676c92a433b9a91f3f4535faddec0c2c3613849ac12f02c1d5cfcd4c3a"},
+		{Type: "k8s", Value: "pod-image:localhost/spiffe/blog:latest"},
+		{Type: "k8s", Value: "pod-image:localhost/spiffe/ghostunnel:latest"},
+		{Type: "k8s", Value: "pod-init-image-count:0"},
+		{Type: "k8s", Value: "pod-label:k8s-app:blog"},
+		{Type: "k8s", Value: "pod-label:version:v0"},
+		{Type: "k8s", Value: "pod-name:blog-24ck7"},
+		{Type: "k8s", Value: "pod-owner-uid:ReplicationController:2c401175-b29f-11e7-9350-020968147796"},
+		{Type: "k8s", Value: "pod-owner:ReplicationController:blog"},
+		{Type: "k8s", Value: "pod-uid:2c48913c-b29f-11e7-9350-020968147796"},
+		{Type: "k8s", Value: "sa:default"},
+		{Type: "k8s", Value: "sigstore-validation:passed"},
+	}
 )
 
 type attestResult struct {
@@ -156,6 +205,12 @@ type Suite struct {
 	server      *httptest.Server
 	kubeletCert *x509.Certificate
 	clientCert  *x509.Certificate
+
+	sigstoreSelectors           []string
+	sigstoreSigs                []oci.Signature
+	sigstoreSkipSigs            bool
+	sigstoreSkippedSigSelectors []string
+	sigstoreReturnError         error
 }
 
 func (s *Suite) SetupTest() {
@@ -167,6 +222,9 @@ func (s *Suite) SetupTest() {
 
 	s.podList = nil
 	s.env = map[string]string{}
+
+	s.sigstoreSelectors = nil
+	s.sigstoreSigs = nil
 }
 
 func (s *Suite) TearDownTest() {
@@ -179,6 +237,33 @@ func (s *Suite) TestAttestWithPidInPod() {
 	p := s.loadInsecurePlugin()
 
 	s.requireAttestSuccessWithPod(p)
+}
+
+func (s *Suite) TestAttestWithSigstoreSignatures() {
+	s.startInsecureKubelet()
+	s.setSigstoreSelectors([]string{"image-signature-subject:sigstore-subject", "sigstore-validation:passed"})
+	p := s.loadInsecurePlugin()
+	s.requireAttestSuccessWithPodandSignature(p)
+	s.setSigstoreSelectors(nil)
+}
+
+func (s *Suite) TestAttestWithSigstoreSkippedImage() {
+	s.startInsecureKubelet()
+	// Skip the image
+	s.setSigstoreSkipSigs(true)
+	s.setSigstoreSkippedSigSelectors([]string{"sigstore-validation:passed"})
+	p := s.loadInsecurePlugin()
+	s.requireAttestSuccessWithPodandSkippedImage(p)
+	s.setSigstoreSkipSigs(false)
+	s.setSigstoreSkippedSigSelectors(nil)
+}
+
+func (s *Suite) TestAttestWithFailedSigstoreSignatures() {
+	s.startInsecureKubelet()
+	p := s.loadInsecurePlugin()
+	s.setSigstoreReturnError(errors.New("sigstore error"))
+	s.requireAttestSuccessWithPod(p)
+	s.setSigstoreReturnError(nil)
 }
 
 func (s *Suite) TestAttestWithPidInKindPod() {
@@ -356,22 +441,27 @@ func (s *Suite) TestConfigure() {
 	s.writeCert("some-other-ca", s.kubeletCert)
 
 	type config struct {
-		Insecure          bool
-		VerifyKubelet     bool
-		HasNodeName       bool
-		Token             string
-		KubeletURL        string
-		MaxPollAttempts   int
-		PollRetryInterval time.Duration
-		ReloadInterval    time.Duration
+		Insecure                  bool
+		VerifyKubelet             bool
+		HasNodeName               bool
+		Token                     string
+		KubeletURL                string
+		MaxPollAttempts           int
+		PollRetryInterval         time.Duration
+		ReloadInterval            time.Duration
+		SkippedImages             []string
+		AllowedSubjectListEnabled bool
+		AllowedSubjects           []string
+		RekorURL                  string
 	}
 
 	testCases := []struct {
-		name   string
-		raw    string
-		hcl    string
-		config *config
-		err    string
+		name          string
+		raw           string
+		hcl           string
+		config        *config
+		sigstoreError error
+		err           string
 	}{
 		{
 			name: "insecure defaults",
@@ -564,18 +654,81 @@ func (s *Suite) TestConfigure() {
 			`,
 			err: "unable to load private key",
 		},
+		{
+			name: "secure defaults with skipped images for sigstore",
+			hcl: `
+				skip_signature_verification_image_list = ["sha:image1hash","sha:image2hash"]
+			`,
+			config: &config{
+				VerifyKubelet:     true,
+				Token:             "default-token",
+				KubeletURL:        "https://127.0.0.1:10250",
+				MaxPollAttempts:   defaultMaxPollAttempts,
+				PollRetryInterval: defaultPollRetryInterval,
+				ReloadInterval:    defaultReloadInterval,
+				SkippedImages: []string{
+					"sha:image1hash",
+					"sha:image2hash",
+				},
+			},
+		},
+		{
+			name: "secure defaults with allowed subjects for sigstore",
+			hcl: `
+				enable_allowed_subjects_list = true,
+				allowed_subjects_list = ["spirex@example.com","spirex1@example.com"]
+			`,
+			config: &config{
+				VerifyKubelet:             true,
+				Token:                     "default-token",
+				KubeletURL:                "https://127.0.0.1:10250",
+				MaxPollAttempts:           defaultMaxPollAttempts,
+				PollRetryInterval:         defaultPollRetryInterval,
+				ReloadInterval:            defaultReloadInterval,
+				AllowedSubjectListEnabled: true,
+				AllowedSubjects:           []string{"spirex@example.com", "spirex1@example.com"},
+			},
+		},
+		{
+			name: "secure defaults with rekor URL",
+			hcl: `
+				rekor_url = "https://rekor.example.com"
+			`,
+			config: &config{
+				VerifyKubelet:     true,
+				Token:             "default-token",
+				KubeletURL:        "https://127.0.0.1:10250",
+				MaxPollAttempts:   defaultMaxPollAttempts,
+				PollRetryInterval: defaultPollRetryInterval,
+				ReloadInterval:    defaultReloadInterval,
+				RekorURL:          "https://rekor.example.com",
+			},
+		},
+		{
+			name: "secure defaults with empty rekor URL",
+			hcl: `
+				rekor_url = "inva{{{lid}"
+			`,
+			sigstoreError: errors.New("Error parsing rekor URI"),
+			config:        nil,
+			err:           "Error parsing rekor URI",
+		},
 	}
 
 	for _, testCase := range testCases {
 		testCase := testCase // alias loop variable as it is used in the closure
 		s.T().Run(testCase.name, func(t *testing.T) {
 			p := s.newPlugin()
-
+			if testCase.sigstoreError != nil {
+				p.sigstore.(*SigstoreMock).returnError = testCase.sigstoreError
+			}
 			var err error
 			plugintest.Load(s.T(), builtin(p), nil,
 				plugintest.Configure(testCase.hcl),
 				plugintest.CaptureConfigureError(&err))
-
+			if testCase.sigstoreError != nil {
+				p.sigstore.(*SigstoreMock).returnError = nil
+			}
 			if testCase.err != "" {
 				s.AssertErrorContains(err, testCase.err)
 				return
@@ -610,8 +763,95 @@ func (s *Suite) TestConfigure() {
 			assert.Equal(t, testCase.config.MaxPollAttempts, c.MaxPollAttempts)
 			assert.Equal(t, testCase.config.PollRetryInterval, c.PollRetryInterval)
 			assert.Equal(t, testCase.config.ReloadInterval, c.ReloadInterval)
+			assert.Equal(t, testCase.config.SkippedImages, c.SkippedImages)
+			assert.Equal(t, testCase.config.AllowedSubjectListEnabled, c.AllowedSubjectListEnabled)
+			assert.Equal(t, testCase.config.AllowedSubjects, c.AllowedSubjects)
+			assert.Equal(t, testCase.config.RekorURL, c.RekorURL)
 		})
 	}
+}
+
+type signature struct {
+	v1.Layer
+
+	payload []byte
+	cert    *x509.Certificate
+}
+
+func (signature) Annotations() (map[string]string, error) {
+	return nil, nil
+}
+
+func (s signature) Payload() ([]byte, error) {
+	return s.payload, nil
+}
+
+func (signature) Base64Signature() (string, error) {
+	return "", nil
+}
+
+func (s signature) Cert() (*x509.Certificate, error) {
+	return s.cert, nil
+}
+
+func (signature) Chain() ([]*x509.Certificate, error) {
+	return nil, nil
+}
+
+func (signature) Bundle() (*oci.Bundle, error) {
+	return nil, nil
+}
+
+type SigstoreMock struct {
+	selectors []string
+
+	sigs                []oci.Signature
+	skipSigs            bool
+	skippedSigSelectors []string
+	returnError         error
+
+	rekorURL string
+}
+
+func (s *SigstoreMock) FetchImageSignatures(imageName string) ([]oci.Signature, error) {
+	return s.sigs, s.returnError
+}
+
+func (s *SigstoreMock) ExtractSelectorsFromSignatures(signatures []oci.Signature, containerID string) []string {
+	return s.selectors
+}
+
+func (s *SigstoreMock) SelectorValuesFromSignature(signatures oci.Signature, containerID string) []string {
+	return s.selectors
+}
+
+func (s *SigstoreMock) ShouldSkipImage(imageID string) (bool, error) {
+	return s.skipSigs, s.returnError
+}
+
+func (s *SigstoreMock) AddSkippedImage(string) {
+}
+func (s *SigstoreMock) ClearSkipList() {
+}
+
+func (s *SigstoreMock) AddAllowedSubject(subject string) {
+}
+
+func (s *SigstoreMock) ClearAllowedSubjects() {
+}
+
+func (s *SigstoreMock) EnableAllowSubjectList(flag bool) {
+}
+func (s *SigstoreMock) AttestContainerSignatures(status *corev1.ContainerStatus) ([]string, error) {
+	if s.skipSigs {
+		return s.skippedSigSelectors, nil
+	}
+	return s.selectors, s.returnError
+}
+
+func (s *SigstoreMock) SetRekorURL(url string) error {
+	s.rekorURL = url
+	return s.returnError
 }
 
 func (s *Suite) newPlugin() *Plugin {
@@ -621,6 +861,14 @@ func (s *Suite) newPlugin() *Plugin {
 	p.getenv = func(key string) string {
 		return s.env[key]
 	}
+	p.sigstore = &SigstoreMock{
+		selectors:           s.sigstoreSelectors,
+		sigs:                s.sigstoreSigs,
+		skipSigs:            s.sigstoreSkipSigs,
+		skippedSigSelectors: s.sigstoreSkippedSigSelectors,
+		returnError:         s.sigstoreReturnError,
+	}
+
 	return p
 }
 
@@ -629,6 +877,32 @@ func (s *Suite) setServer(server *httptest.Server) {
 		s.server.Close()
 	}
 	s.server = server
+}
+
+func (s *Suite) setSigstoreSelectors(selectors []string) {
+	s.sigstoreSelectors = selectors
+	if s.sigstoreSelectors == nil {
+		s.sigstoreSigs = nil
+	} else {
+		s.sigstoreSigs = []oci.Signature{
+			signature{
+				payload: []byte("payload"),
+				cert:    &x509.Certificate{},
+			},
+		}
+	}
+}
+
+func (s *Suite) setSigstoreSkipSigs(skip bool) {
+	s.sigstoreSkipSigs = skip
+}
+
+func (s *Suite) setSigstoreSkippedSigSelectors(selectors []string) {
+	s.sigstoreSkippedSigSelectors = selectors
+}
+
+func (s *Suite) setSigstoreReturnError(err error) {
+	s.sigstoreReturnError = err
 }
 
 func (s *Suite) writeFile(path, data string) {
@@ -788,6 +1062,18 @@ func (s *Suite) requireAttestSuccessWithPod(p workloadattestor.WorkloadAttestor)
 	s.addPodListResponse(podListFilePath)
 	s.addCgroupsResponse(cgPidInPodFilePath)
 	s.requireAttestSuccess(p, testPodSelectors)
+}
+
+func (s *Suite) requireAttestSuccessWithPodandSignature(p workloadattestor.WorkloadAttestor) {
+	s.addPodListResponse(podListFilePath)
+	s.addCgroupsResponse(cgPidInPodFilePath)
+	s.requireAttestSuccess(p, testSigstoreSelectors)
+}
+
+func (s *Suite) requireAttestSuccessWithPodandSkippedImage(p workloadattestor.WorkloadAttestor) {
+	s.addPodListResponse(podListFilePath)
+	s.addCgroupsResponse(cgPidInPodFilePath)
+	s.requireAttestSuccess(p, testSigstoreSkippedSelectors)
 }
 
 func (s *Suite) requireAttestSuccessWithKindPod(p workloadattestor.WorkloadAttestor) {

@@ -28,6 +28,8 @@ import (
 	workloadattestorv1 "github.com/spiffe/spire-plugin-sdk/proto/spire/plugin/agent/workloadattestor/v1"
 	configv1 "github.com/spiffe/spire-plugin-sdk/proto/spire/service/common/config/v1"
 	"github.com/spiffe/spire/pkg/agent/common/cgroups"
+	"github.com/spiffe/spire/pkg/agent/plugin/workloadattestor/k8s/sigstore"
+	"github.com/spiffe/spire/pkg/agent/plugin/workloadattestor/k8s/sigstorecache"
 	"github.com/spiffe/spire/pkg/common/catalog"
 	"github.com/spiffe/spire/pkg/common/pemutil"
 	"github.com/spiffe/spire/pkg/common/telemetry"
@@ -52,6 +54,7 @@ type containerLookup int
 const (
 	containerInPod = iota
 	containerNotInPod
+	maximumAmountCache = 10
 )
 
 func builtin(p *Plugin) catalog.BuiltIn {
@@ -114,6 +117,18 @@ type HCLConfig struct {
 	// ReloadInterval controls how often TLS and token configuration is loaded
 	// from the disk.
 	ReloadInterval string `hcl:"reload_interval"`
+
+	// RekorURL is the URL for the rekor server to use to verify signatures and public keys
+	RekorURL string `hcl:"rekor_url"`
+
+	// SkippedImages is a list of images that should skip sigstore verification
+	SkippedImages []string `hcl:"skip_signature_verification_image_list"`
+
+	// AllowedSubjects is a flag indicating whether signature subjects should be compared against the allow-list
+	AllowedSubjectListEnabled bool `hcl:"enable_allowed_subjects_list"`
+
+	// AllowedSubjects is a list of subjects that should be allowed after verification
+	AllowedSubjects []string `hcl:"allowed_subjects_list"`
 }
 
 // k8sConfig holds the configuration distilled from HCL
@@ -130,6 +145,12 @@ type k8sConfig struct {
 	NodeName                string
 	ReloadInterval          time.Duration
 
+	RekorURL      string
+	SkippedImages []string
+
+	AllowedSubjectListEnabled bool
+	AllowedSubjects           []string
+
 	Client     *kubeletClient
 	LastReload time.Time
 }
@@ -145,13 +166,17 @@ type Plugin struct {
 
 	mu     sync.RWMutex
 	config *k8sConfig
+
+	sigstore sigstore.Sigstore
 }
 
 func New() *Plugin {
+	newcache := sigstorecache.NewCache(maximumAmountCache)
 	return &Plugin{
-		fs:     cgroups.OSFileSystem{},
-		clock:  clock.New(),
-		getenv: os.Getenv,
+		fs:       cgroups.OSFileSystem{},
+		clock:    clock.New(),
+		getenv:   os.Getenv,
+		sigstore: sigstore.New(newcache),
 	}
 }
 
@@ -199,8 +224,16 @@ func (p *Plugin) Attest(ctx context.Context, req *workloadattestorv1.AttestReque
 			status, lookup := lookUpContainerInPod(containerID, item.Status)
 			switch lookup {
 			case containerInPod:
+				selectors := getSelectorValuesFromPodInfo(&item, status)
+				sigstoreSelectors, err := p.sigstore.AttestContainerSignatures(status)
+				if err != nil {
+					log.Error("Error retrieving signature payload: ", err.Error())
+				} else {
+					selectors = append(selectors, sigstoreSelectors...)
+				}
+
 				return &workloadattestorv1.AttestResponse{
-					SelectorValues: getSelectorValuesFromPodInfo(&item, status),
+					SelectorValues: selectors,
 				}, nil
 			case containerNotInPod:
 			}
@@ -294,9 +327,36 @@ func (p *Plugin) Configure(ctx context.Context, req *configv1.ConfigureRequest) 
 		KubeletCAPath:           config.KubeletCAPath,
 		NodeName:                nodeName,
 		ReloadInterval:          reloadInterval,
+
+		RekorURL:                  config.RekorURL,
+		SkippedImages:             config.SkippedImages,
+		AllowedSubjectListEnabled: config.AllowedSubjectListEnabled,
+		AllowedSubjects:           config.AllowedSubjects,
 	}
 	if err := p.reloadKubeletClient(c); err != nil {
 		return nil, err
+	}
+
+	// Configure sigstore settings
+	p.sigstore.ClearSkipList()
+	if c.SkippedImages != nil {
+		for _, imageID := range c.SkippedImages {
+			p.sigstore.AddSkippedImage(imageID)
+		}
+	}
+
+	p.sigstore.EnableAllowSubjectList(c.AllowedSubjectListEnabled)
+	p.sigstore.ClearAllowedSubjects()
+	if c.AllowedSubjects != nil {
+		for _, subject := range c.AllowedSubjects {
+			p.sigstore.AddAllowedSubject(subject)
+		}
+	}
+	if c.RekorURL != "" {
+		err = p.sigstore.SetRekorURL(c.RekorURL)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// Set the config
