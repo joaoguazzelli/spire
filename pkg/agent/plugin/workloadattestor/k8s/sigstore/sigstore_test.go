@@ -2,12 +2,19 @@ package sigstore
 
 import (
 	"context"
+	"crypto"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"errors"
 	"fmt"
+	"math/big"
 	"net/url"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/google/go-containerregistry/pkg/name"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
@@ -135,8 +142,8 @@ func TestSigstoreimpl_FetchImageSignatures(t *testing.T) {
 	}
 	emptyCheckOptsFunction := func(url.URL) *cosign.CheckOpts {
 		co := &cosign.CheckOpts{}
-		co.RekorClient := new(client.Rekor)
-		rootCert, _, _ := test.GenerateRootCa()
+		co.RekorClient = new(rekor.Rekor)
+		rootCert, _, _ := GenerateRootCa()
 		rootPool := x509.NewCertPool()
 		rootPool.AddCert(rootCert)
 		co.RootCerts = rootPool
