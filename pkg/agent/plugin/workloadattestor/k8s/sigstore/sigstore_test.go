@@ -997,7 +997,7 @@ func TestSigstoreimpl_ValidateImage(t *testing.T) {
 			fields: fields{
 				verifyFunction: createNilVerifyFunction(),
 				fetchImageManifestFunction: createFetchFunction(&remote.Descriptor{
-					Manifest: []byte(f0c62edf734ff52ee830c9eeef2ceefad94f7f089706d170f8d9dc64befb57cc),
+					Manifest: []byte("f0c62edf734ff52ee830c9eeef2ceefad94f7f089706d170f8d9dc64befb57cc"),
 				}, nil),
 			},
 			args: args{
