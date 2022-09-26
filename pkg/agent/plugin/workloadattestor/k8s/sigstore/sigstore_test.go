@@ -993,7 +993,7 @@ func TestSigstoreimpl_ValidateImage(t *testing.T) {
 			wantedErr: errors.New("manifest is empty"),
 		},
 		{
-			name: "validate hash manifest",
+			name: "validate hashed manifest",
 			fields: fields{
 				verifyFunction: createNilVerifyFunction(),
 				fetchImageManifestFunction: createFetchFunction(&remote.Descriptor{
