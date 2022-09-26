@@ -992,6 +992,26 @@ func TestSigstoreimpl_ValidateImage(t *testing.T) {
 			wantErr:   true,
 			wantedErr: errors.New("manifest is empty"),
 		},
+		{
+			name: "validate hash manifest",
+			fields: fields{
+				verifyFunction: createNilVerifyFunction(),
+				fetchImageManifestFunction: createFetchFunction(&remote.Descriptor{
+					Manifest: []byte(`f0c62edf734ff52ee830c9eeef2ceefad94f7f089706d170f8d9dc64befb57cc`),
+				}, nil),
+			},
+			args: args{
+				ref: name.MustParseReference("example.com/sampleimage@sha256:f037cc8ec4cd38f95478773741fdecd48d721a527d19013031692edbf95fae69"),
+			},
+			wantedFetchArguments: fetchFunctionArguments{
+				called:  true,
+				ref:     name.MustParseReference("example.com/sampleimage@sha256:f037cc8ec4cd38f95478773741fdecd48d721a527d19013031692edbf95fae69"),
+				options: nil,
+			},
+			wantedVerifyArguments: verifyFunctionArguments{},
+			want:                  true,
+			wantErr:               false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
