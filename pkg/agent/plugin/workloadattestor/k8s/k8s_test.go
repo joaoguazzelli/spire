@@ -80,30 +80,8 @@ FwOGLt+I3+9beT0vo+pn9Rq0squewFYe3aJbwpkyfP2xOovQCdm4PC8y
 	testPodAndContainerSelectors = append(testPodSelectors, testContainerSelectors...)
 )
 
-type attestResult struct {
-	selectors []*common.Selector
-	err       error
-}
-
 func TestPlugin(t *testing.T) {
 	spiretest.Run(t, new(Suite))
-}
-
-type Suite struct {
-	spiretest.Suite
-
-	dir   string
-	clock *clock.Mock
-
-	podList [][]byte
-	env     map[string]string
-
-	// kubelet stuff
-	server      *httptest.Server
-	kubeletCert *x509.Certificate
-	clientCert  *x509.Certificate
-
-	oc *osConfig
 }
 
 func (s *Suite) SetupTest() {
@@ -115,6 +93,7 @@ func (s *Suite) SetupTest() {
 
 	s.podList = nil
 	s.env = map[string]string{}
+
 	s.oc = createOSConfig()
 }
 
@@ -285,14 +264,18 @@ func (s *Suite) TestConfigure() {
 	s.writeCert("some-other-ca", s.kubeletCert)
 
 	type config struct {
-		Insecure          bool
-		VerifyKubelet     bool
-		HasNodeName       bool
-		Token             string
-		KubeletURL        string
-		MaxPollAttempts   int
-		PollRetryInterval time.Duration
-		ReloadInterval    time.Duration
+		Insecure                  bool
+		VerifyKubelet             bool
+		HasNodeName               bool
+		Token                     string
+		KubeletURL                string
+		MaxPollAttempts           int
+		PollRetryInterval         time.Duration
+		ReloadInterval            time.Duration
+		SkippedImages             []string
+		AllowedSubjectListEnabled bool
+		AllowedSubjects           []string
+		RekorURL                  string
 	}
 
 	testCases := []struct {
@@ -563,6 +546,7 @@ func (s *Suite) newPlugin() *Plugin {
 	p.getenv = func(key string) string {
 		return s.env[key]
 	}
+
 	return p
 }
 
@@ -604,7 +588,7 @@ func (s *Suite) loadPlugin(configuration string) workloadattestor.WorkloadAttest
 		plugintest.Configure(configuration),
 	)
 
-	if cHelper := s.oc.getContainerHelper(); cHelper != nil {
+	if cHelper := s.oc.getContainerHelper(p); cHelper != nil {
 		p.setContainerHelper(cHelper)
 	}
 	return v1
@@ -807,6 +791,28 @@ func (s *Suite) addPodListResponse(fixturePath string) {
 	s.Require().NoError(err)
 
 	s.podList = append(s.podList, podList)
+}
+
+type Suite struct {
+	spiretest.Suite
+
+	dir   string
+	clock *clock.Mock
+
+	podList [][]byte
+	env     map[string]string
+
+	// kubelet stuff
+	server      *httptest.Server
+	kubeletCert *x509.Certificate
+	clientCert  *x509.Certificate
+
+	oc *osConfig
+}
+
+type attestResult struct {
+	selectors []*common.Selector
+	err       error
 }
 
 type testFS string
