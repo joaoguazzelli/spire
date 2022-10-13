@@ -221,10 +221,8 @@ func configureSigstoreClient(client sigstore.Sigstore, c *SigstoreHCLConfig, log
 	client.EnableAllowSubjectList(c.AllowedSubjectListEnabled)
 	client.SetLogger(log)
 	client.ClearAllowedSubjects()
-	if c.AllowedSubjects != nil {
-		for _, subject := range c.AllowedSubjects {
-			client.AddAllowedSubject(subject)
-		}
+	for _, subject := range c.AllowedSubjects {
+		client.AddAllowedSubject(subject)
 	}
 	if err := client.SetRekorURL(c.RekorURL); err != nil {
 		return status.Errorf(codes.InvalidArgument, "failed to parse Rekor URL: %v", err)
