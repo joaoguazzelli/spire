@@ -11,6 +11,7 @@ import (
 
 	"github.com/hashicorp/go-hclog"
 	"github.com/spiffe/spire/pkg/agent/common/cgroups"
+	"github.com/spiffe/spire/pkg/agent/plugin/workloadattestor/k8s/sigstore"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"k8s.io/apimachinery/pkg/types"
@@ -178,4 +179,21 @@ func canonicalizePodUID(uid string) types.UID {
 
 func isNotPod(itemPodUID, podUID types.UID) bool {
 	return podUID != "" && itemPodUID != podUID
+}
+func configureSigstoreClient(client sigstore.Sigstore, c *SigstoreHCLConfig, log hclog.Logger) error {
+	// Configure sigstore settings
+	client.ClearSkipList()
+	if c.SkippedImages != nil {
+		client.AddSkippedImage(c.SkippedImages)
+	}
+	client.EnableAllowSubjectList(c.AllowedSubjectListEnabled)
+	client.SetLogger(log)
+	client.ClearAllowedSubjects()
+	for _, subject := range c.AllowedSubjects {
+		client.AddAllowedSubject(subject)
+	}
+	if err := client.SetRekorURL(c.RekorURL); err != nil {
+		return status.Errorf(codes.InvalidArgument, "failed to parse Rekor URL: %v", err)
+	}
+	return nil
 }
