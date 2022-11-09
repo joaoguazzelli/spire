@@ -86,6 +86,38 @@ func New(cache Cache, logger hclog.Logger) Sigstore {
 	}
 }
 
+func defaultCheckOptsFunction(rekorURL url.URL, privateDeployment ...bool) (*cosign.CheckOpts, error) {
+	if len(privateDeployment) > 1 {
+		return nil, errors.New("privateDeployment can be only one value")
+	}
+	if len(privateDeployment) == 0 {
+		privateDeployment[0] = true
+	}
+	switch {
+	case rekorURL.Host == "":
+		return nil, errors.New("rekor URL host is empty")
+	case rekorURL.Scheme == "":
+		return nil, errors.New("rekor URL scheme is empty")
+	case rekorURL.Path == "":
+		return nil, errors.New("rekor URL path is empty")
+	}
+
+	rootCerts, err := fulcio.GetRoots()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get fulcio root certificates: %w", err)
+	}
+
+	co := &cosign.CheckOpts{
+		// Set the rekor client
+		RekorClient: rekor.NewHTTPClientWithConfig(nil, rekor.DefaultTransportConfig().WithBasePath(rekorURL.Path).WithHost(rekorURL.Host)),
+		RootCerts:   rootCerts,
+		EnforceSCT:  privateDeployment[0],
+	}
+	co.IntermediateCerts, err = fulcio.GetIntermediates()
+
+	return co, err
+}
+
 type sigstoreImpl struct {
 	functionHooks    sigstoreFunctionHooks
 	skippedImages    map[string]struct{}
@@ -429,7 +461,7 @@ type verifyFunctionType func(context.Context, name.Reference, *cosign.CheckOpts)
 
 type fetchImageManifestFunctionType func(name.Reference, ...remote.Option) (*remote.Descriptor, error)
 
-type checkOptsFunctionType func(url.URL) (*cosign.CheckOpts, error)
+type checkOptsFunctionType func(url.URL, ...bool) (*cosign.CheckOpts, error)
 
 type sigstoreFunctionHooks struct {
 	verifyFunction             verifyFunctionType
