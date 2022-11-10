@@ -37,7 +37,7 @@ const (
 type Sigstore interface {
 	AttestContainerSignatures(ctx context.Context, status *corev1.ContainerStatus) ([]string, error)
 	FetchImageSignatures(ctx context.Context, imageName string) ([]oci.Signature, error)
-	SelectorValuesFromSignature(oci.Signature, string) (*SelectorsFromSignatures, error)
+	SelectorValuesFromSignature(oci.Signature) (*SelectorsFromSignatures, error)
 	ExtractSelectorsFromSignatures(signatures []oci.Signature, containerID string) []SelectorsFromSignatures
 	ShouldSkipImage(imageID string) (bool, error)
 	AddSkippedImage(imageID []string)
@@ -164,7 +164,7 @@ func (s *sigstoreImpl) ExtractSelectorsFromSignatures(signatures []oci.Signature
 	var selectors []SelectorsFromSignatures
 	for _, sig := range signatures {
 		// verify which subject
-		sigSelectors, err := s.SelectorValuesFromSignature(sig, containerID)
+		sigSelectors, err := s.SelectorValuesFromSignature(sig)
 		if err != nil {
 			s.logger.Error("error extracting selectors from signature", "error", err)
 		}
@@ -177,7 +177,7 @@ func (s *sigstoreImpl) ExtractSelectorsFromSignatures(signatures []oci.Signature
 
 // SelectorValuesFromSignature extracts selectors from a signature.
 // returns a list of selectors.
-func (s *sigstoreImpl) SelectorValuesFromSignature(signature oci.Signature, containerID string) (*SelectorsFromSignatures, error) {
+func (s *sigstoreImpl) SelectorValuesFromSignature(signature oci.Signature) (*SelectorsFromSignatures, error) {
 	subject, err := getSignatureSubject(signature)
 	if err != nil {
 		return nil, fmt.Errorf("error getting signature subject: %w", err)

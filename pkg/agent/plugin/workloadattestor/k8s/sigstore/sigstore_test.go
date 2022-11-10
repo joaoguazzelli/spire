@@ -1579,7 +1579,7 @@ func TestSigstoreimpl_SelectorValuesFromSignature(t *testing.T) {
 					sigstore.AddAllowedSubject(issuer, subject)
 				}
 			}
-			got, err := sigstore.SelectorValuesFromSignature(tt.args.signature, tt.containerID)
+			got, err := sigstore.SelectorValuesFromSignature(tt.args.signature)
 			assert.Equal(t, got, tt.want)
 			if tt.wantedErr != nil {
 				require.EqualError(t, err, tt.wantedErr.Error())
