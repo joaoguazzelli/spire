@@ -2000,7 +2000,7 @@ func createNilFetchFunction() fetchFunctionBinding {
 
 func createCheckOptsFunction(returnCheckOpts *cosign.CheckOpts, returnErr error) checkOptsFunctionBinding {
 	bindCheckOptsArgumentsFunction := func(t require.TestingT, checkOptsArguments *checkOptsFunctionArguments) checkOptsFunctionType {
-		newCheckOptsFunction := func(url url.URL) (*cosign.CheckOpts, error) {
+		newCheckOptsFunction := func(url url.URL, privateDeployment ...bool) (*cosign.CheckOpts, error) {
 			checkOptsArguments.url = url
 			return returnCheckOpts, returnErr
 		}
@@ -2011,7 +2011,7 @@ func createCheckOptsFunction(returnCheckOpts *cosign.CheckOpts, returnErr error)
 
 func createNilCheckOptsFunction() checkOptsFunctionBinding {
 	bindCheckOptsArgumentsFunction := func(t require.TestingT, checkOptsArguments *checkOptsFunctionArguments) checkOptsFunctionType {
-		failFunction := func(url url.URL) (*cosign.CheckOpts, error) {
+		failFunction := func(url url.URL, privateDeployment ...bool) (*cosign.CheckOpts, error) {
 			require.FailNow(t, "nil check opts function should not be called")
 			return nil, fmt.Errorf("nil check opts function should not be called")
 		}
