@@ -91,7 +91,7 @@ func defaultCheckOptsFunction(rekorURL url.URL, privateDeployment ...bool) (*cos
 		return nil, errors.New("privateDeployment can be only one value")
 	}
 	if len(privateDeployment) == 0 {
-		privateDeployment[0] = true
+		privateDeployment = append(privateDeployment, true)
 	}
 	switch {
 	case rekorURL.Host == "":
