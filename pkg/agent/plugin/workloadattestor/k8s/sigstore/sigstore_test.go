@@ -1598,7 +1598,6 @@ func TestSigstoreimpl_AttestContainerSignatures(t *testing.T) {
 		wantedVerifyArguments    verifyFunctionArguments
 		wantedCheckOptsArguments checkOptsFunctionArguments
 		want                     []string
-		wantErr                  bool
 		wantedErr                error
 	}{
 		{
@@ -1647,7 +1646,6 @@ func TestSigstoreimpl_AttestContainerSignatures(t *testing.T) {
 			want: []string{
 				"000000:image-signature-subject:spirex@example.com", "000000:image-signature-content:MEUCIQCyem8Gcr0sPFMP7fTXazCN57NcN5+MjxJw9Oo0x2eM+AIgdgBP96BO1Te/NdbjHbUeb0BUye6deRgVtQEv5No5smA=", "000000:image-signature-logid:samplelogID", "000000:image-signature-integrated-time:12345", "sigstore-validation:passed",
 			},
-			wantErr: false,
 		},
 		{
 			name: "Attest skipped image",
@@ -1670,7 +1668,6 @@ func TestSigstoreimpl_AttestContainerSignatures(t *testing.T) {
 			want: []string{
 				"sigstore-validation:passed",
 			},
-			wantErr: false,
 		},
 		{
 			name: "Attest image with no signature",
@@ -1705,7 +1702,6 @@ func TestSigstoreimpl_AttestContainerSignatures(t *testing.T) {
 				url:    rekorDefaultURL(),
 			},
 			want:      nil,
-			wantErr:   true,
 			wantedErr: fmt.Errorf("error verifying signature: %w", errors.New("no signature found")),
 		},
 		{
@@ -1735,7 +1731,6 @@ func TestSigstoreimpl_AttestContainerSignatures(t *testing.T) {
 				url:    url.URL{},
 			},
 			want:      nil,
-			wantErr:   true,
 			wantedErr: fmt.Errorf("could not create cosign check options: %w", emptyError),
 		},
 	}
@@ -1757,13 +1752,10 @@ func TestSigstoreimpl_AttestContainerSignatures(t *testing.T) {
 			}
 			got, err := sigstore.AttestContainerSignatures(context.Background(), &tt.status)
 
-			if err != nil {
-				if !tt.wantErr {
-					t.Errorf("sigstoreImpl.AttestContainerSignatures() has error, wantErr %v", tt.wantErr)
-				}
+			if tt.wantedErr != nil {
 				require.EqualError(t, err, tt.wantedErr.Error(), "sigstoreImpl.AttestContainerSignatures() error = %v, wantedErr = %v", err, tt.wantedErr)
-			} else if tt.wantErr {
-				t.Errorf("sigstoreImpl.AttestContainerSignatures() no error, wantErr = %v, wantedErr %v", tt.wantErr, tt.wantedErr)
+			} else {
+				require.NoError(t, err)
 			}
 
 			require.Equal(t, tt.want, got, "sigstoreImpl.AttestContainerSignatures() = %v, want %v", got, tt.want)
@@ -1786,7 +1778,6 @@ func TestSigstoreimpl_SetRekorURL(t *testing.T) {
 		fields    fields
 		args      args
 		want      url.URL
-		wantErr   bool
 		wantedErr error
 	}{
 		{
@@ -1801,7 +1792,6 @@ func TestSigstoreimpl_SetRekorURL(t *testing.T) {
 				Scheme: "https",
 				Host:   "rekor.com",
 			},
-			wantErr: false,
 		},
 		{
 			name: "SetRekorURL with empty url",
@@ -1818,7 +1808,6 @@ func TestSigstoreimpl_SetRekorURL(t *testing.T) {
 				Scheme: "https",
 				Host:   "non.empty.url",
 			},
-			wantErr:   true,
 			wantedErr: fmt.Errorf("rekor URL is empty"),
 		},
 		{
@@ -1830,7 +1819,6 @@ func TestSigstoreimpl_SetRekorURL(t *testing.T) {
 				rekorURL: "http://invalid.{{}))}.url.com", // invalid url
 			},
 			want:      url.URL{},
-			wantErr:   true,
 			wantedErr: fmt.Errorf("failed parsing rekor URI: parse %q: invalid character %q in host name", "http://invalid.{{}))}.url.com", "{"),
 		},
 		{
@@ -1842,7 +1830,6 @@ func TestSigstoreimpl_SetRekorURL(t *testing.T) {
 				rekorURL: "path-no-host", // URI parser uses this as path, not host
 			},
 			want:      url.URL{},
-			wantErr:   true,
 			wantedErr: fmt.Errorf("host is required on rekor URL"),
 		},
 		{
@@ -1854,7 +1841,6 @@ func TestSigstoreimpl_SetRekorURL(t *testing.T) {
 				rekorURL: "abc://invalid.url.com", // invalid scheme
 			},
 			want:      url.URL{},
-			wantErr:   true,
 			wantedErr: fmt.Errorf("invalid rekor URL Scheme %q", "abc"),
 		},
 	}
