@@ -1296,7 +1296,7 @@ func TestSigstoreimpl_SelectorValuesFromSignature(t *testing.T) {
 			containerID: "111111",
 			want:        nil,
 			wantErr:     true,
-			wantedErr:   fmt.Errorf("error getting signature subject: empty subject"),
+			wantedErr:   errors.New("error getting signature subject: empty subject"),
 		},
 		{
 			name: "selector from signature, not in allowlist",
@@ -1314,7 +1314,7 @@ func TestSigstoreimpl_SelectorValuesFromSignature(t *testing.T) {
 			containerID: "222222",
 			want:        nil,
 			wantErr:     true,
-			wantedErr:   fmt.Errorf("subject %q not in allow-list", "spirex1@example.com"),
+			wantedErr:   errors.New("subject \"spirex1@example.com\" not in allow-list"),
 		},
 		{
 			name: "selector from signature, allowedlist enabled, in allowlist",
@@ -1368,7 +1368,7 @@ func TestSigstoreimpl_SelectorValuesFromSignature(t *testing.T) {
 			containerID: "444444",
 			want:        nil,
 			wantErr:     true,
-			wantedErr:   fmt.Errorf("error getting signature content: bundle payload body has no signature content"),
+			wantedErr:   errors.New("error getting signature content: bundle payload body has no signature content"),
 		},
 		{
 			name: "selector from signature, nil bundle",
@@ -1384,7 +1384,7 @@ func TestSigstoreimpl_SelectorValuesFromSignature(t *testing.T) {
 			containerID: "555555",
 			want:        nil,
 			wantErr:     true,
-			wantedErr:   fmt.Errorf("error getting signature bundle: no bundle test"),
+			wantedErr:   errors.New("error getting signature bundle: no bundle test"),
 		},
 		{
 			name: "selector from signature, bundle payload body is not a string",
@@ -1407,7 +1407,7 @@ func TestSigstoreimpl_SelectorValuesFromSignature(t *testing.T) {
 			containerID: "000000",
 			want:        nil,
 			wantErr:     true,
-			wantedErr:   fmt.Errorf("error getting signature content: expected payload body to be a string but got int instead"),
+			wantedErr:   errors.New("error getting signature content: expected payload body to be a string but got int instead"),
 		},
 		{
 			name: "selector from signature, bundle payload body is not valid base64",
@@ -1430,7 +1430,7 @@ func TestSigstoreimpl_SelectorValuesFromSignature(t *testing.T) {
 			containerID: "000000",
 			want:        nil,
 			wantErr:     true,
-			wantedErr:   fmt.Errorf("error getting signature content: illegal base64 data at input byte 3"),
+			wantedErr:   errors.New("error getting signature content: illegal base64 data at input byte 3"),
 		},
 		{
 			name: "selector from signature, bundle payload body has no signature content",
@@ -1453,7 +1453,7 @@ func TestSigstoreimpl_SelectorValuesFromSignature(t *testing.T) {
 			containerID: "000000",
 			want:        nil,
 			wantErr:     true,
-			wantedErr:   fmt.Errorf("error getting signature content: bundle payload body has no signature content"),
+			wantedErr:   errors.New("error getting signature content: bundle payload body has no signature content"),
 		},
 		{
 			name: "selector from signature, bundle payload body signature content is empty",
@@ -1476,7 +1476,7 @@ func TestSigstoreimpl_SelectorValuesFromSignature(t *testing.T) {
 			containerID: "000000",
 			want:        nil,
 			wantErr:     true,
-			wantedErr:   fmt.Errorf("error getting signature content: bundle payload body has no signature content"),
+			wantedErr:   errors.New("error getting signature content: bundle payload body has no signature content"),
 		},
 		{
 			name: "selector from signature, bundle payload body is not a valid JSON",
@@ -1499,7 +1499,7 @@ func TestSigstoreimpl_SelectorValuesFromSignature(t *testing.T) {
 			containerID: "000000",
 			want:        nil,
 			wantErr:     true,
-			wantedErr:   fmt.Errorf("error getting signature content: failed to parse bundle body: invalid character ',' looking for beginning of value"),
+			wantedErr:   errors.New("error getting signature content: failed to parse bundle body: invalid character ',' looking for beginning of value"),
 		},
 		{
 			name: "selector from signature, empty signature array",
@@ -1513,7 +1513,7 @@ func TestSigstoreimpl_SelectorValuesFromSignature(t *testing.T) {
 			containerID: "000000",
 			want:        nil,
 			wantErr:     true,
-			wantedErr:   fmt.Errorf("error getting signature subject: signature is nil"),
+			wantedErr:   errors.New("error getting signature subject: signature is nil"),
 		},
 		{
 			name: "selector from signature, single image signature, no payload",
@@ -1527,7 +1527,7 @@ func TestSigstoreimpl_SelectorValuesFromSignature(t *testing.T) {
 			containerID: "000000",
 			want:        nil,
 			wantErr:     true,
-			wantedErr:   fmt.Errorf("error getting signature subject: no payload test"),
+			wantedErr:   errors.New("error getting signature subject: no payload test"),
 		},
 		{
 			name: "selector from signature, single image signature, no certs",
@@ -1543,7 +1543,7 @@ func TestSigstoreimpl_SelectorValuesFromSignature(t *testing.T) {
 			containerID: "000000",
 			want:        nil,
 			wantErr:     true,
-			wantedErr:   fmt.Errorf("error getting signature subject: failed to access signature certificate: no cert test"),
+			wantedErr:   errors.New("error getting signature subject: failed to access signature certificate: no cert test"),
 		},
 		{
 			name: "selector from signature, single image signature,garbled subject in signature",
@@ -1559,7 +1559,7 @@ func TestSigstoreimpl_SelectorValuesFromSignature(t *testing.T) {
 			containerID: "000000",
 			want:        nil,
 			wantErr:     true,
-			wantedErr:   fmt.Errorf("error getting signature subject: invalid character '0' in string escape code"),
+			wantedErr:   errors.New("error getting signature subject: invalid character '0' in string escape code"),
 		},
 	}
 
