@@ -127,7 +127,6 @@ func TestSigstoreimpl_FetchImageSignatures(t *testing.T) {
 		wantedVerifyArguments    verifyFunctionArguments
 		wantedCheckOptsArguments checkOptsFunctionArguments
 		want                     []oci.Signature
-		wantErr                  bool
 		wantedErr                error
 	}{
 		{
@@ -167,7 +166,6 @@ func TestSigstoreimpl_FetchImageSignatures(t *testing.T) {
 					payload: []byte(`{"critical": {"identity": {"docker-reference": "docker-registry.com/some/image"},"image": {"docker-manifest-digest": "02c15a8d1735c65bb8ca86c716615d3c0d8beb87dc68ed88bb49192f90b184e2"},"type": "some type"},"optional": {"subject": "spirex@example.com","key2": "value 2","key3": "value 3"}}`),
 				},
 			},
-			wantErr: false,
 		},
 		{
 			name: "fetch image with 2 signatures",
@@ -212,7 +210,6 @@ func TestSigstoreimpl_FetchImageSignatures(t *testing.T) {
 					payload: []byte(`{"critical": {"identity": {"docker-reference": "docker-registry.com/some/image"},"image": {"docker-manifest-digest": "some digest"},"type": "some type"},"optional": {"subject": "spirex@example.com","key2": "value 4","key3": "value 5"}}`),
 				},
 			},
-			wantErr: false,
 		},
 		{
 			name: "fetch image with no signature",
@@ -243,7 +240,6 @@ func TestSigstoreimpl_FetchImageSignatures(t *testing.T) {
 				url:    rekorDefaultURL(),
 			},
 			want:      nil,
-			wantErr:   true,
 			wantedErr: fmt.Errorf("error verifying signature: %w", errors.New("no matching signatures 2")),
 		},
 		{ // TODO: check again, same as above test. should never happen, since the verify function returns an error on empty verified signature list
@@ -275,7 +271,6 @@ func TestSigstoreimpl_FetchImageSignatures(t *testing.T) {
 				url:    rekorDefaultURL(),
 			},
 			want:      nil,
-			wantErr:   false,
 			wantedErr: nil,
 		},
 		{
@@ -311,7 +306,6 @@ func TestSigstoreimpl_FetchImageSignatures(t *testing.T) {
 				url:    rekorDefaultURL(),
 			},
 			want:      nil,
-			wantErr:   true,
 			wantedErr: fmt.Errorf("error verifying signature: %w", errors.New("unexpected error")),
 		},
 		{
@@ -347,7 +341,6 @@ func TestSigstoreimpl_FetchImageSignatures(t *testing.T) {
 				url:    rekorDefaultURL(),
 			},
 			want:      nil,
-			wantErr:   true,
 			wantedErr: fmt.Errorf("bundle not verified for %q", "docker-registry.com/some/image@sha256:5fb2054478353fd8d514056d1745b3a9eef066deadda4b90967af7ca65ce6505"),
 		},
 		{
@@ -364,7 +357,6 @@ func TestSigstoreimpl_FetchImageSignatures(t *testing.T) {
 				imageName: "invali|].url.com/some/image@sha256:5fb2054478353fd8d514056d1745b3a9eef066deadda4b90967af7ca65ce6505",
 			},
 			want:      nil,
-			wantErr:   true,
 			wantedErr: fmt.Errorf("error parsing image reference: %w", errors.New("could not parse reference: invali|].url.com/some/image@sha256:5fb2054478353fd8d514056d1745b3a9eef066deadda4b90967af7ca65ce6505")),
 		},
 		{
@@ -391,7 +383,6 @@ func TestSigstoreimpl_FetchImageSignatures(t *testing.T) {
 				url:    url.URL{},
 			},
 			want:      nil,
-			wantErr:   true,
 			wantedErr: fmt.Errorf("could not create cosign check options: %w", emptyError),
 		},
 		{
@@ -415,7 +406,6 @@ func TestSigstoreimpl_FetchImageSignatures(t *testing.T) {
 			wantedVerifyArguments:    verifyFunctionArguments{},
 			wantedCheckOptsArguments: checkOptsFunctionArguments{},
 			want:                     nil,
-			wantErr:                  true,
 			wantedErr:                fmt.Errorf("could not validate image reference digest: %w", errors.New("digest sha256:5fb2054478353fd8d514056d1745b3a9eef066deadda4b90967af7ca65ce6505 does not match sha256:4fb2054478353fd8d514056d1745b3a9eef066deadda4b90967af7ca65ce6505")),
 		},
 	}
@@ -434,7 +424,7 @@ func TestSigstoreimpl_FetchImageSignatures(t *testing.T) {
 				rekorURL:      tt.fields.rekorURL,
 			}
 			got, err := sigstore.FetchImageSignatures(context.Background(), tt.args.imageName)
-			if tt.wantErr {
+			if tt.wantedErr != nil {
 				require.EqualError(t, err, tt.wantedErr.Error())
 			} else {
 				require.NoError(t, err)
@@ -933,7 +923,6 @@ func TestSigstoreimpl_ValidateImage(t *testing.T) {
 		wantedFetchArguments  fetchFunctionArguments
 		wantedVerifyArguments verifyFunctionArguments
 		want                  bool
-		wantErr               bool
 		wantedErr             error
 	}{
 		{
@@ -954,7 +943,6 @@ func TestSigstoreimpl_ValidateImage(t *testing.T) {
 			},
 			wantedVerifyArguments: verifyFunctionArguments{},
 			want:                  true,
-			wantErr:               false,
 		},
 		{
 			name: "error on image manifest fetch",
@@ -971,7 +959,6 @@ func TestSigstoreimpl_ValidateImage(t *testing.T) {
 				options: nil,
 			},
 			want:      false,
-			wantErr:   true,
 			wantedErr: errors.New("fetch error 123"),
 		},
 		{
@@ -991,7 +978,6 @@ func TestSigstoreimpl_ValidateImage(t *testing.T) {
 				options: nil,
 			},
 			want:      false,
-			wantErr:   true,
 			wantedErr: errors.New("manifest is empty"),
 		},
 		{
@@ -1012,7 +998,6 @@ func TestSigstoreimpl_ValidateImage(t *testing.T) {
 			},
 			wantedVerifyArguments: verifyFunctionArguments{},
 			want:                  true,
-			wantErr:               false,
 		},
 	}
 	for _, tt := range tests {
@@ -1245,7 +1230,6 @@ func TestSigstoreimpl_SelectorValuesFromSignature(t *testing.T) {
 		args        args
 		containerID string
 		want        *SelectorsFromSignatures
-		wantErr     bool
 		wantedErr   error
 	}{
 		{
@@ -1273,7 +1257,6 @@ func TestSigstoreimpl_SelectorValuesFromSignature(t *testing.T) {
 				LogID:          "samplelogID",
 				IntegratedTime: "12345",
 			},
-			wantErr: false,
 		},
 		{
 			name: "selector from signature, empty subject",
@@ -1295,7 +1278,6 @@ func TestSigstoreimpl_SelectorValuesFromSignature(t *testing.T) {
 			},
 			containerID: "111111",
 			want:        nil,
-			wantErr:     true,
 			wantedErr:   errors.New("error getting signature subject: empty subject"),
 		},
 		{
@@ -1313,7 +1295,6 @@ func TestSigstoreimpl_SelectorValuesFromSignature(t *testing.T) {
 			},
 			containerID: "222222",
 			want:        nil,
-			wantErr:     true,
 			wantedErr:   errors.New("subject \"spirex1@example.com\" not in allow-list"),
 		},
 		{
@@ -1343,7 +1324,6 @@ func TestSigstoreimpl_SelectorValuesFromSignature(t *testing.T) {
 				LogID:          "samplelogID",
 				IntegratedTime: "12345",
 			},
-			wantErr: false,
 		},
 		{
 			name: "selector from signature, allowedlist enabled, in allowlist, empty content",
@@ -1367,7 +1347,6 @@ func TestSigstoreimpl_SelectorValuesFromSignature(t *testing.T) {
 			},
 			containerID: "444444",
 			want:        nil,
-			wantErr:     true,
 			wantedErr:   errors.New("error getting signature content: bundle payload body has no signature content"),
 		},
 		{
@@ -1383,7 +1362,6 @@ func TestSigstoreimpl_SelectorValuesFromSignature(t *testing.T) {
 			},
 			containerID: "555555",
 			want:        nil,
-			wantErr:     true,
 			wantedErr:   errors.New("error getting signature bundle: no bundle test"),
 		},
 		{
@@ -1406,7 +1384,6 @@ func TestSigstoreimpl_SelectorValuesFromSignature(t *testing.T) {
 			},
 			containerID: "000000",
 			want:        nil,
-			wantErr:     true,
 			wantedErr:   errors.New("error getting signature content: expected payload body to be a string but got int instead"),
 		},
 		{
@@ -1429,7 +1406,6 @@ func TestSigstoreimpl_SelectorValuesFromSignature(t *testing.T) {
 			},
 			containerID: "000000",
 			want:        nil,
-			wantErr:     true,
 			wantedErr:   errors.New("error getting signature content: illegal base64 data at input byte 3"),
 		},
 		{
@@ -1452,7 +1428,6 @@ func TestSigstoreimpl_SelectorValuesFromSignature(t *testing.T) {
 			},
 			containerID: "000000",
 			want:        nil,
-			wantErr:     true,
 			wantedErr:   errors.New("error getting signature content: bundle payload body has no signature content"),
 		},
 		{
@@ -1475,7 +1450,6 @@ func TestSigstoreimpl_SelectorValuesFromSignature(t *testing.T) {
 			},
 			containerID: "000000",
 			want:        nil,
-			wantErr:     true,
 			wantedErr:   errors.New("error getting signature content: bundle payload body has no signature content"),
 		},
 		{
@@ -1498,7 +1472,6 @@ func TestSigstoreimpl_SelectorValuesFromSignature(t *testing.T) {
 			},
 			containerID: "000000",
 			want:        nil,
-			wantErr:     true,
 			wantedErr:   errors.New("error getting signature content: failed to parse bundle body: invalid character ',' looking for beginning of value"),
 		},
 		{
@@ -1512,7 +1485,6 @@ func TestSigstoreimpl_SelectorValuesFromSignature(t *testing.T) {
 			},
 			containerID: "000000",
 			want:        nil,
-			wantErr:     true,
 			wantedErr:   errors.New("error getting signature subject: signature is nil"),
 		},
 		{
@@ -1526,7 +1498,6 @@ func TestSigstoreimpl_SelectorValuesFromSignature(t *testing.T) {
 			},
 			containerID: "000000",
 			want:        nil,
-			wantErr:     true,
 			wantedErr:   errors.New("error getting signature subject: no payload test"),
 		},
 		{
@@ -1542,7 +1513,6 @@ func TestSigstoreimpl_SelectorValuesFromSignature(t *testing.T) {
 			},
 			containerID: "000000",
 			want:        nil,
-			wantErr:     true,
 			wantedErr:   errors.New("error getting signature subject: failed to access signature certificate: no cert test"),
 		},
 		{
@@ -1558,7 +1528,6 @@ func TestSigstoreimpl_SelectorValuesFromSignature(t *testing.T) {
 			},
 			containerID: "000000",
 			want:        nil,
-			wantErr:     true,
 			wantedErr:   errors.New("error getting signature subject: invalid character '0' in string escape code"),
 		},
 	}
