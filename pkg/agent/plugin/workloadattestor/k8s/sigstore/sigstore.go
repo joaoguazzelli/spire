@@ -86,12 +86,12 @@ func New(cache Cache, logger hclog.Logger) Sigstore {
 	}
 }
 
-func defaultCheckOptsFunction(rekorURL url.URL, privateDeployment ...bool) (*cosign.CheckOpts, error) {
-	if len(privateDeployment) > 1 {
-		return nil, errors.New("privateDeployment can be only one value")
+func defaultCheckOptsFunction(rekorURL url.URL, enforceSCT ...bool) (*cosign.CheckOpts, error) {
+	if len(enforceSCT) > 1 {
+		return nil, errors.New("enforceSCT can be only one value")
 	}
-	if len(privateDeployment) == 0 {
-		privateDeployment = append(privateDeployment, true)
+	if len(enforceSCT) == 0 {
+		enforceSCT = append(enforceSCT, true)
 	}
 	switch {
 	case rekorURL.Host == "":
@@ -111,7 +111,7 @@ func defaultCheckOptsFunction(rekorURL url.URL, privateDeployment ...bool) (*cos
 		// Set the rekor client
 		RekorClient: rekor.NewHTTPClientWithConfig(nil, rekor.DefaultTransportConfig().WithBasePath(rekorURL.Path).WithHost(rekorURL.Host)),
 		RootCerts:   rootCerts,
-		EnforceSCT:  privateDeployment[0],
+		EnforceSCT:  enforceSCT[0],
 	}
 	co.IntermediateCerts, err = fulcio.GetIntermediates()
 
