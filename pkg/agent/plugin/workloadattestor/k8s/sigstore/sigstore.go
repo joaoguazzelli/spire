@@ -46,6 +46,7 @@ type Sigstore interface {
 	ClearAllowedSubjects()
 	SetRekorURL(rekorURL string) error
 	SetLogger(logger hclog.Logger)
+	SetEnforceSCT(enforceSCT bool)
 }
 
 // The following structs are used to go through the payload json objects
@@ -81,6 +82,8 @@ func New(cache Cache, logger hclog.Logger) Sigstore {
 			fetchImageManifestFunction: remote.Get,
 			checkOptsFunction:          defaultCheckOptsFunction,
 		},
+
+		enforceSCT:    true,
 		logger:        logger,
 		sigstorecache: cache,
 	}
@@ -125,6 +128,11 @@ type sigstoreImpl struct {
 	rekorURL         url.URL
 	logger           hclog.Logger
 	sigstorecache    Cache
+	enforceSCT       bool
+}
+
+func (s *sigstoreImpl) SetEnforceSCT(enforceSCT bool) {
+	s.enforceSCT = enforceSCT
 }
 
 func (s *sigstoreImpl) SetLogger(logger hclog.Logger) {
