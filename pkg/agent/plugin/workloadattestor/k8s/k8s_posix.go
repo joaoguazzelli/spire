@@ -214,7 +214,13 @@ func canonicalizePodUID(uid string) types.UID {
 
 func configureSigstoreClient(client sigstore.Sigstore, c *SigstoreHCLConfig, log hclog.Logger) error {
 	// Configure sigstore settings
-	client.SetEnforceSCT(c.EnforceSCT)
+
+	enforceSCT := true
+	if c.EnforceSCT != nil {
+		enforceSCT = *c.EnforceSCT
+	}
+
+	client.SetEnforceSCT(enforceSCT)
 
 	client.ClearSkipList()
 	if c.SkippedImages != nil {
