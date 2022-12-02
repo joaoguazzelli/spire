@@ -684,12 +684,17 @@ type sigstoreMock struct {
 	allowedSubjects     map[string]map[string]struct{}
 	log                 hclog.Logger
 
-	rekorURL string
+	rekorURL   string
+	enforceSCT bool
 }
 
 // SetLogger implements sigstore.Sigstore
 func (s *sigstoreMock) SetLogger(logger hclog.Logger) {
 	s.log = logger
+}
+
+func (s *sigstoreMock) SetEnforceSCT(enforceSCT bool) {
+	s.enforceSCT = enforceSCT
 }
 
 func (s *sigstoreMock) FetchImageSignatures(ctx context.Context, imageName string) ([]oci.Signature, error) {
