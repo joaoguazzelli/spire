@@ -468,28 +468,3 @@ type sigstoreFunctionHooks struct {
 	fetchImageManifestFunction fetchImageManifestFunctionType
 	checkOptsFunction          checkOptsFunctionType
 }
-
-func defaultCheckOptsFunction(rekorURL url.URL) (*cosign.CheckOpts, error) {
-	switch {
-	case rekorURL.Host == "":
-		return nil, errors.New("rekor URL host is empty")
-	case rekorURL.Scheme == "":
-		return nil, errors.New("rekor URL scheme is empty")
-	case rekorURL.Path == "":
-		return nil, errors.New("rekor URL path is empty")
-	}
-
-	rootCerts, err := fulcio.GetRoots()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get fulcio root certificates: %w", err)
-	}
-
-	co := &cosign.CheckOpts{
-		// Set the rekor client
-		RekorClient: rekor.NewHTTPClientWithConfig(nil, rekor.DefaultTransportConfig().WithBasePath(rekorURL.Path).WithHost(rekorURL.Host).WithSchemes([]string{rekorURL.Scheme})),
-		RootCerts:   rootCerts,
-	}
-	co.IntermediateCerts, err = fulcio.GetIntermediates()
-
-	return co, err
-}
