@@ -685,7 +685,7 @@ type sigstoreMock struct {
 	log                 hclog.Logger
 
 	rekorURL   string
-	enforceSCT *bool
+	enforceSCT bool
 }
 
 // SetLogger implements sigstore.Sigstore
@@ -693,7 +693,7 @@ func (s *sigstoreMock) SetLogger(logger hclog.Logger) {
 	s.log = logger
 }
 
-func (s *sigstoreMock) SetEnforceSCT(enforceSCT *bool) {
+func (s *sigstoreMock) SetEnforceSCT(enforceSCT bool) {
 	s.enforceSCT = enforceSCT
 }
 

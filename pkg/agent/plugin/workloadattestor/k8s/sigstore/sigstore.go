@@ -47,7 +47,7 @@ type Sigstore interface {
 	ClearAllowedSubjects()
 	SetRekorURL(rekorURL string) error
 	SetLogger(logger hclog.Logger)
-	SetEnforceSCT(enforceSCT *bool)
+	SetEnforceSCT(enforceSCT bool)
 }
 
 // The following structs are used to go through the payload json objects
@@ -465,7 +465,7 @@ type verifyFunctionType func(context.Context, name.Reference, *cosign.CheckOpts)
 
 type fetchImageManifestFunctionType func(name.Reference, ...remote.Option) (*remote.Descriptor, error)
 
-type checkOptsFunctionType func(url.URL, *bool) (*cosign.CheckOpts, error)
+type checkOptsFunctionType func(url.URL, bool) (*cosign.CheckOpts, error)
 
 type sigstoreImpl struct {
 	functionHooks    sigstoreFunctionHooks

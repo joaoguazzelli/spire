@@ -219,7 +219,7 @@ func configureSigstoreClient(client sigstore.Sigstore, c *SigstoreHCLConfig, log
 		enforceSCT = *c.EnforceSCT
 	}
 
-	client.SetEnforceSCT(&enforceSCT)
+	client.SetEnforceSCT(enforceSCT)
 
 	client.ClearSkipList()
 	if c.SkippedImages != nil {
