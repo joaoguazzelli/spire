@@ -75,7 +75,6 @@ func TestSigstoreimpl_FetchImageSignatures(t *testing.T) {
 	type fields struct {
 		functionBindings sigstoreFunctionBindings
 		rekorURL         url.URL
-		enforceSCT       *bool
 	}
 	enforceSCT := true
 
