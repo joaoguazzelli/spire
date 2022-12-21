@@ -12,13 +12,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/hashicorp/go-hclog"
 	"net/url"
 	"strconv"
 
 	"github.com/google/go-containerregistry/pkg/name"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
-	"github.com/hashicorp/go-hclog"
 	"github.com/sigstore/cosign/cmd/cosign/cli/fulcio"
 	"github.com/sigstore/cosign/pkg/cosign"
 	"github.com/sigstore/cosign/pkg/cosign/bundle"
@@ -47,7 +47,7 @@ type Sigstore interface {
 	ClearAllowedSubjects()
 	SetRekorURL(rekorURL string) error
 	SetLogger(logger hclog.Logger)
-	SetEnforceSCT(enforceSCT bool)
+	SetEnforceSCT(enforceSCT *bool)
 }
 
 // The following structs are used to go through the payload json objects
@@ -84,7 +84,6 @@ func New(cache Cache, logger hclog.Logger) Sigstore {
 			checkOptsFunction:          defaultCheckOptsFunction,
 		},
 
-		enforceSCT:    true,
 		logger:        logger,
 		sigstorecache: cache,
 	}
@@ -466,7 +465,7 @@ type verifyFunctionType func(context.Context, name.Reference, *cosign.CheckOpts)
 
 type fetchImageManifestFunctionType func(name.Reference, ...remote.Option) (*remote.Descriptor, error)
 
-type checkOptsFunctionType func(url.URL, ...bool) (*cosign.CheckOpts, error)
+type checkOptsFunctionType func(url.URL, *bool) (*cosign.CheckOpts, error)
 
 type sigstoreImpl struct {
 	functionHooks    sigstoreFunctionHooks
