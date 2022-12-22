@@ -317,13 +317,7 @@ func (s *sigstoreImpl) SetRekorURL(rekorURL string) error {
 	return nil
 }
 
-func defaultCheckOptsFunction(rekorURL url.URL, enforceSCT ...bool) (*cosign.CheckOpts, error) {
-	if len(enforceSCT) > 1 {
-		return nil, errors.New("enforceSCT can be only one value")
-	}
-	if len(enforceSCT) == 0 {
-		enforceSCT = append(enforceSCT, true)
-	}
+func defaultCheckOptsFunction(rekorURL url.URL, enforceSCT bool) (*cosign.CheckOpts, error) {
 	switch {
 	case rekorURL.Host == "":
 		return nil, errors.New("rekor URL host is empty")
@@ -342,7 +336,7 @@ func defaultCheckOptsFunction(rekorURL url.URL, enforceSCT ...bool) (*cosign.Che
 		// Set the rekor client
 		RekorClient: rekor.NewHTTPClientWithConfig(nil, rekor.DefaultTransportConfig().WithBasePath(rekorURL.Path).WithHost(rekorURL.Host)),
 		RootCerts:   rootCerts,
-		EnforceSCT:  enforceSCT[0],
+		EnforceSCT:  enforceSCT,
 	}
 	co.IntermediateCerts, err = fulcio.GetIntermediates()
 
